@@ -9,6 +9,10 @@ jobs:
   run-scripts:
     runs-on: ubuntu-latest
 
+    env:
+      SHOPIFY_TOKEN: ${{ secrets.SHOPIFY_TOKEN }}
+      SHOPIFY_URL: ${{ secrets.SHOPIFY_URL }}
+      
     steps:
       - name: 📥 Repository klonen
         uses: actions/checkout@v3
