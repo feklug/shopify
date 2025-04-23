@@ -1,0 +1,30 @@
+name: Shopify Auto Sync
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Jeden Tag um 00:00 UTC (Achtung: UTC = 02:00 Uhr in MESZ)
+  workflow_dispatch:      # Optional, manuell auslösbar über GitHub UI
+
+jobs:
+  run-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Repository klonen
+        uses: actions/checkout@v3
+
+      - name: 🐍 Python installieren
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: 🔧 Abhängigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🧼 Scraper ausführen
+        run: python scrape.py  # <-- Name deiner Scraping-Datei
+
+      - name: 🛒 Shopify Uploader ausführen
+        run: python addtoshopify.py  # <-- Datei zum Hochladen
