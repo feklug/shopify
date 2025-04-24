@@ -16,6 +16,18 @@ base_urls = {
     "derschutze": "https://derschutze.com/collections/all/products.json?page=",
     "MoreMoneyMoreLove": "https://moremoneymorelove.de/collections/all/products.json?page=",
     "Devourarchive": "https://www.devourarchive.com/collections/all/products.json?page=",
+    "statement-clo": "https://statement-clo.de/collections/all/products.json?page=",
+    "mosquets": "https://mosquets.de/collections/all/products.json?page=",
+    "vacid": "https://www.vacid.com/collections/all/products.json?page=",
+    "root-atelier": "https://www.root-atelier.com/de-en/collections/all/products.json?page=",
+    "olakala": "https://www.olakala.de/collections/all/products.json?page=",
+    "eightyfiveclo": "https://www.eightyfiveclo.com/collections/all/products.json?page=",
+    "atelier-roupa": "https://atelier-roupa.com/collections/all/products.json?page=",
+    "tarmac.clothing": "https://tarmac.clothing/de/collections/all/products.json?page=",
+    "pegador": "https://pegador.com/collections/all/products.json?page=",
+    "sourire-worldwide": "https://sourire-worldwide.com/collections/all/products.json?page=",
+    "liju-gallery": "https://liju-gallery.com/collections/all/products.json?page=",
+    
 }
 
 # Dictionary zur Speicherung der Ergebnisse

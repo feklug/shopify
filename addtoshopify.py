@@ -75,6 +75,9 @@ def update_inventory(inventory_item_id, available):
 
 def build_product_payload(product_data, is_update=False):
     """Baut das Produkt-Payload mit published_at und anderen Feldern"""
+    # Zuerst prüfen, ob mindestens eine Variante verfügbar ist
+    has_available_variant = any(variant.get("available", False) for variant in product_data["variants"])
+    
     payload = {
         "product": {
             "title": product_data["title"],
@@ -98,8 +101,8 @@ def build_product_payload(product_data, is_update=False):
         except ValueError as e:
             print(f"⚠️ Ungültiges published_at Format: {e}, wird nicht übernommen")
     else:
-        payload["product"]["published_at"] = datetime.now().isoformat()
-        print("ℹ️ published_at nicht angegeben, setze auf aktuelles Datum")
+        payload["product"]["published_at"] = datetime.now().isoformat() if has_available_variant else None
+        print(f"ℹ️ published_at nicht angegeben, setze auf {'aktuelles Datum' if has_available_variant else 'None'}")
 
     # Metadaten verarbeiten
     metadata_fields = {
@@ -161,7 +164,7 @@ def build_product_payload(product_data, is_update=False):
         except KeyError as e:
             print(f"⚠️ Wichtiges Variantenfeld fehlt: {e}, Variante wird übersprungen")
     
-    return payload
+    return payload, has_available_variant
 
 def process_product(product, existing_products):
     """Verarbeitet ein einzelnes Produkt"""
@@ -169,6 +172,12 @@ def process_product(product, existing_products):
         # Validierung der Produktdaten
         if "title" not in product or "variants" not in product or not product["variants"]:
             print("❌ Produktdaten unvollständig, überspringe Produkt")
+            return False
+
+        # Prüfe, ob mindestens eine Variante verfügbar ist
+        has_available_variant = any(variant.get("available", False) for variant in product["variants"])
+        if not has_available_variant:
+            print(f"⏭️ Produkt '{product['title']}' hat keine verfügbaren Varianten, wird übersprungen")
             return False
 
         # Suche nach vorhandenem Produkt basierend auf SKU der ersten Variante
@@ -200,8 +209,13 @@ def process_product(product, existing_products):
                 print(f"❌ Fehler beim Aktualisieren des Bestands für Variante {existing_variant['sku']}")
 
             # Produktdetails aktualisieren
-            product_payload = build_product_payload(product, is_update=True)
+            product_payload, has_available = build_product_payload(product, is_update=True)
             product_payload["product"]["id"] = existing_product["id"]
+            
+            # Wenn keine Varianten mehr verfügbar sind, Produkt als unveröffentlicht markieren
+            if not has_available:
+                product_payload["product"]["published_at"] = None
+                print("ℹ️ Keine verfügbaren Varianten mehr, Produkt wird unveröffentlicht")
             
             response = make_shopify_request(
                 f"{product_url}{existing_product['id']}.json",
@@ -219,7 +233,7 @@ def process_product(product, existing_products):
         else:
             print(f"➕ Produkt '{product['title']}' existiert noch nicht. Füge hinzu...")
             
-            product_payload = build_product_payload(product)
+            product_payload, _ = build_product_payload(product)
             response = make_shopify_request(api_url, method="POST", json_data=product_payload)
             
             if response:
@@ -280,14 +294,25 @@ def process_brand_file(brand_file):
 # Liste der Markendateien
 brand_files = [
     'output/pesoclo.json',
-    'output/6pm.json',
-    'output/trendtvision.json',
-    'output/reternity.json',
-    'output/Systemic.json',
-    'output/Vicinity.json',
-    'output/derschutze.json',
-    'output/MoreMoneyMoreLove.json',
-    'output/Devourarchive.json'
+'output/6pm.json',
+'output/trendtvision.json',
+'output/reternity.json',
+'output/Systemic.json',
+'output/Vicinity.json',
+'output/derschutze.json',
+'output/MoreMoneyMoreLove.json',
+'output/Devourarchive.json',
+'output/statement-clo.json',
+'output/mosquets.json',
+'output/vacid.json',
+'output/root-atelier.json',
+'output/olakala.json',
+'output/eightyfiveclo.json',
+'output/atelier-roupa.json',
+'output/tarmac.clothing.json',
+'output/pegador.json',
+'output/sourire-worldwide.json',
+'output/liju-gallery.json',
 
 ]
 
