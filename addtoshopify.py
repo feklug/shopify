@@ -293,7 +293,7 @@ def process_brand_file(brand_file):
 
 # Liste der Markendateien
 brand_files = [
-    'output/pesoclo.json',
+'output/pesoclo.json',
 'output/6pm.json',
 'output/trendtvision.json',
 'output/reternity.json',
@@ -313,6 +313,12 @@ brand_files = [
 'output/pegador.json',
 'output/sourire-worldwide.json',
 'output/liju-gallery.json',
+'output/sacralite.json',
+'output/unvainstudios.json',
+'output/hunidesign.json',
+'output/deputydepartment.json',
+'output/99based.json',
+'output/rarehumansclothing.json',
 
 ]
 
