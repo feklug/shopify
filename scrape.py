@@ -7,7 +7,7 @@ os.makedirs("output", exist_ok=True)
 
 # Dictionary mit Marken und deren Shopify-Produkt-URLs
 base_urls = {
-    "pesoclo": "https://pesoclo.com/de-at/collections/all/products.json?page=",
+"pesoclo": "https://pesoclo.com/de-at/collections/all/products.json?page=",
     "6pm": "https://www.6pmseason.com/collections/all/products.json?page=",
     "trendtvision": "https://www.trendtvision.com/collections/all/products.json?page=",
     "reternity": "https://reternity.de/collections/all/products.json?page=",
@@ -27,7 +27,14 @@ base_urls = {
     "pegador": "https://pegador.com/collections/all/products.json?page=",
     "sourire-worldwide": "https://sourire-worldwide.com/collections/all/products.json?page=",
     "liju-gallery": "https://liju-gallery.com/collections/all/products.json?page=",
-    
+    "sacralite": "https://sacralite.com/collections/all/products.json?page=",
+    "unvainstudios": "https://unvainstudios.de/collections/all/products.json?page=",
+    "hunidesign": "https://hunidesign.com/collections/all/products.json?page=",
+    "deputydepartment": "https://deputydepartment.com/en-at/collections/all/products.json?page=",
+    "99based": "https://99based.com/collections/all/products.json?page=",
+    "rarehumansclothing": "https://www.rarehumansclothing.com/collections/all/products.json?page=",
+
+}
 }
 
 # Dictionary zur Speicherung der Ergebnisse
