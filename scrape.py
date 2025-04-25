@@ -35,7 +35,7 @@ base_urls = {
     "rarehumansclothing": "https://www.rarehumansclothing.com/collections/all/products.json?page=",
 
 }
-}
+
 
 # Dictionary zur Speicherung der Ergebnisse
 brand_results = {}
