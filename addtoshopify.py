@@ -54,14 +54,37 @@ def get_existing_products(force_refresh=False):
     current_time = time.time()
     if force_refresh or existing_products_cache is None or (current_time - last_cache_update) > CACHE_TTL:
         print("🔄 Aktualisiere Produkt-Cache...")
-        response = make_shopify_request(f"{api_url}?limit=250")
-        if response:
-            existing_products_cache = response.json().get("products", [])
-            last_cache_update = current_time
-        else:
-            existing_products_cache = []
+        all_products = []
+        url = f"{api_url}?limit=250"
+        
+        while url:
+            # Hole die Produkte der aktuellen Seite
+            response = make_shopify_request(url)
+            if response:
+                products = response.json().get("products", [])
+                all_products.extend(products)
+
+                # Überprüfe den Link-Header auf den nächsten Seiten-Link
+                if 'Link' in response.headers:
+                    links = response.headers['Link']
+                    # Extrahiere den nächsten Seiten-Link
+                    next_page_url = None
+                    for link in links.split(','):
+                        if 'rel="next"' in link:
+                            next_page_url = link[link.find('<') + 1:link.find('>')]
+                            break
+                    url = next_page_url  # Setze die URL auf den nächsten Seiten-Link
+                else:
+                    break
+            else:
+                break
+
+        existing_products_cache = all_products
+        last_cache_update = current_time
     
     return existing_products_cache
+
+
 
 def update_inventory(inventory_item_id, available):
     """Aktualisiert den Bestand basierend auf 'available'."""
@@ -75,9 +98,6 @@ def update_inventory(inventory_item_id, available):
 
 def build_product_payload(product_data, is_update=False):
     """Baut das Produkt-Payload mit published_at und anderen Feldern"""
-    # Zuerst prüfen, ob mindestens eine Variante verfügbar ist
-    has_available_variant = any(variant.get("available", False) for variant in product_data["variants"])
-    
     payload = {
         "product": {
             "title": product_data["title"],
@@ -101,8 +121,8 @@ def build_product_payload(product_data, is_update=False):
         except ValueError as e:
             print(f"⚠️ Ungültiges published_at Format: {e}, wird nicht übernommen")
     else:
-        payload["product"]["published_at"] = datetime.now().isoformat() if has_available_variant else None
-        print(f"ℹ️ published_at nicht angegeben, setze auf {'aktuelles Datum' if has_available_variant else 'None'}")
+        payload["product"]["published_at"] = datetime.now().isoformat()
+        print("ℹ️ published_at nicht angegeben, setze auf aktuelles Datum")
 
     # Metadaten verarbeiten
     metadata_fields = {
@@ -164,7 +184,7 @@ def build_product_payload(product_data, is_update=False):
         except KeyError as e:
             print(f"⚠️ Wichtiges Variantenfeld fehlt: {e}, Variante wird übersprungen")
     
-    return payload, has_available_variant
+    return payload
 
 def process_product(product, existing_products):
     """Verarbeitet ein einzelnes Produkt"""
@@ -174,10 +194,10 @@ def process_product(product, existing_products):
             print("❌ Produktdaten unvollständig, überspringe Produkt")
             return False
 
-        # Prüfe, ob mindestens eine Variante verfügbar ist
-        has_available_variant = any(variant.get("available", False) for variant in product["variants"])
-        if not has_available_variant:
-            print(f"⏭️ Produkt '{product['title']}' hat keine verfügbaren Varianten, wird übersprungen")
+        # Überprüfe, ob mindestens eine Variante verfügbar ist
+        available_variant = next((v for v in product["variants"] if v["available"]), None)
+        if not available_variant:
+            print(f"❌ Keine verfügbare Variante für Produkt '{product['title']}', überspringe Produkt")
             return False
 
         # Suche nach vorhandenem Produkt basierend auf SKU der ersten Variante
@@ -209,13 +229,8 @@ def process_product(product, existing_products):
                 print(f"❌ Fehler beim Aktualisieren des Bestands für Variante {existing_variant['sku']}")
 
             # Produktdetails aktualisieren
-            product_payload, has_available = build_product_payload(product, is_update=True)
+            product_payload = build_product_payload(product, is_update=True)
             product_payload["product"]["id"] = existing_product["id"]
-            
-            # Wenn keine Varianten mehr verfügbar sind, Produkt als unveröffentlicht markieren
-            if not has_available:
-                product_payload["product"]["published_at"] = None
-                print("ℹ️ Keine verfügbaren Varianten mehr, Produkt wird unveröffentlicht")
             
             response = make_shopify_request(
                 f"{product_url}{existing_product['id']}.json",
@@ -233,7 +248,7 @@ def process_product(product, existing_products):
         else:
             print(f"➕ Produkt '{product['title']}' existiert noch nicht. Füge hinzu...")
             
-            product_payload, _ = build_product_payload(product)
+            product_payload = build_product_payload(product)
             response = make_shopify_request(api_url, method="POST", json_data=product_payload)
             
             if response:
