@@ -325,7 +325,6 @@ brand_files = [
 'output/eightyfiveclo.json',
 'output/atelier-roupa.json',
 'output/tarmac.clothing.json',
-'output/pegador.json',
 'output/sourire-worldwide.json',
 'output/liju-gallery.json',
 'output/sacralite.json',
