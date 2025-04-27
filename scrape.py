@@ -24,7 +24,6 @@ base_urls = {
     "eightyfiveclo": "https://www.eightyfiveclo.com/collections/all/products.json?page=",
     "atelier-roupa": "https://atelier-roupa.com/collections/all/products.json?page=",
     "tarmac.clothing": "https://tarmac.clothing/de/collections/all/products.json?page=",
-    "pegador": "https://pegador.com/collections/all/products.json?page=",
     "sourire-worldwide": "https://sourire-worldwide.com/collections/all/products.json?page=",
     "liju-gallery": "https://liju-gallery.com/collections/all/products.json?page=",
     "sacralite": "https://sacralite.com/collections/all/products.json?page=",
