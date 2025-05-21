@@ -345,7 +345,7 @@ brand_files = [
 'output/hunidesign.json',
 'output/deputydepartment.json',
 'output/99based.json',
-'output/rarehumansclothing.json',
+
 
 ]
 
