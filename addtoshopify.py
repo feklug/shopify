@@ -315,18 +315,35 @@ if __name__ == "__main__":
         total_processed += process_brand_file(brand_file)
         get_existing_products(force_refresh=True)
 
-    print("🧹 Suche veraltete Produkte in Shopify...")
+    # Veraltete Produkte deaktivieren
     existing_products = get_existing_products(force_refresh=True)
-    disabled_count = 0
 
-    for product in existing_products:
-        for variant in product["variants"]:
+    def disable_unlisted_variants(existing_products, seen_skus, max_workers=10):
+        print("🧹 Suche veraltete Produkte in Shopify...")
+        variants_to_disable = []
+
+        for product in existing_products:
+            for variant in product["variants"]:
+                sku = variant.get("sku")
+                if sku and sku not in seen_skus:
+                    variants_to_disable.append(variant)
+
+        print(f"⚠️ {len(variants_to_disable)} Varianten gefunden, die deaktiviert werden müssen...")
+
+        def disable_variant(variant):
             sku = variant.get("sku")
-            if sku and sku not in seen_skus:
-                print(f"🚫 SKU {sku} nicht mehr vorhanden – Setze Bestand auf 0")
-                success = update_inventory(variant["inventory_item_id"], available=False)
-                if success:
-                    disabled_count += 1
+            success = update_inventory(variant["inventory_item_id"], available=False)
+            if success:
+                print(f"🚫 Bestand auf 0 für SKU {sku}")
+                return 1
+            return 0
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = executor.map(disable_variant, variants_to_disable)
+
+        return sum(results)
+
+    disabled_count = disable_unlisted_variants(existing_products, seen_skus)
 
     total_time = time.time() - start_time
     print(f"✅ Bestand für {disabled_count} veraltete Produkte auf 0 gesetzt.")
