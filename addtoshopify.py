@@ -37,7 +37,8 @@ def calculate_adjusted_price(original_price):
         if isinstance(original_price, str):
             original_price = float(original_price.replace("€", "").strip())
         
-        increased_price = original_price * 1.075  # 7.5% Aufschlag
+        # 7.5% Aufschlag
+        increased_price = original_price * 1.075
         
         # Auf X.99 aufrunden
         if increased_price % 1 < 0.99:
@@ -109,24 +110,24 @@ def update_inventory(inventory_item_id, available):
     payload = {
         "location_id": LOCATION_ID,
         "inventory_item_id": inventory_item_id,
-        "available": available  # Tatsächlichen Wert verwenden, nicht hartcodiert
+        "available": 1000 if available else 0
     }
     response = make_shopify_request(inventory_url, method="POST", json_data=payload)
     return response is not None
 
 def build_product_payload(product_data, is_update=False):
-    # Bestimme ob Optionen benötigt werden (nur bei mehreren Varianten)
-    needs_options = len(product_data["variants"]) > 1
-    
     payload = {
         "product": {
             "title": product_data["title"],
             "body_html": product_data.get("body_html", ""),
-            "options": [{"name": "Size"}] if needs_options else [],
             "variants": [],
             "images": []
         }
     }
+
+    # Nur Size-Option hinzufügen, wenn es mehrere Varianten gibt oder explizit benötigt
+    if len(product_data["variants"]) > 1 or any(v.get("variant_title") for v in product_data["variants"]):
+        payload["product"]["options"] = [{"name": "Size"}]
 
     # Veröffentlichungsdatum
     published_at = product_data.get("published_at")
@@ -135,14 +136,24 @@ def build_product_payload(product_data, is_update=False):
             if isinstance(published_at, str):
                 datetime.fromisoformat(published_at)
                 payload["product"]["published_at"] = published_at
+            else:
+                print("⚠️ published_at ist kein String, wird nicht übernommen")
         except ValueError as e:
             print(f"⚠️ Ungültiges published_at Format: {e}, wird nicht übernommen")
-    elif not is_update:
+    else:
         payload["product"]["published_at"] = datetime.now().isoformat()
 
     # Metadaten
-    metadata_fields = ["vendor", "product_type", "tags", "handle", "created_at", "updated_at"]
-    for field in metadata_fields:
+    metadata_fields = {
+        "vendor": None,
+        "product_type": None,
+        "tags": None,
+        "handle": None,
+        "created_at": None,
+        "updated_at": None
+    }
+
+    for field, default in metadata_fields.items():
         if field in product_data:
             if field.endswith("_at") and product_data[field]:
                 try:
@@ -163,24 +174,34 @@ def build_product_payload(product_data, is_update=False):
             image_urls.add(img_url)
     payload["product"]["images"] = [{"src": img} for img in image_urls]
 
-    # Varianten
+    # Varianten mit korrigierter optionaler Felder-Behandlung
     for variant in product_data["variants"]:
         try:
             original_price = variant["price"]
             adjusted_price = calculate_adjusted_price(original_price)
             
             variant_payload = {
-                "option1": variant.get("variant_title", "Default Title") if needs_options else "Default Title",
                 "price": str(adjusted_price),
                 "sku": variant["sku"],
-                "inventory_quantity": variant.get("inventory_quantity", 1000 if variant["available"] else 0),
+                "inventory_quantity": 1000 if variant["available"] else 0,
                 "inventory_management": "shopify",
                 "inventory_policy": "deny"
             }
 
-            # Optionale Felder
-            optional_fields = ["barcode", "weight", "weight_unit", "taxable", "compare_at_price"]
-            for field in optional_fields:
+            # Nur option1 hinzufügen, wenn ein variant_title existiert
+            if "variant_title" in variant:
+                variant_payload["option1"] = variant["variant_title"]
+
+            # Korrigierte Behandlung optionaler Felder
+            optional_fields = {
+                "barcode": None,
+                "weight": None,
+                "weight_unit": None,
+                "taxable": None,
+                "compare_at_price": None
+            }
+            
+            for field, default in optional_fields.items():
                 if field in variant:
                     variant_payload[field] = variant[field]
 
@@ -195,76 +216,85 @@ def build_product_payload(product_data, is_update=False):
 
 def process_product(product, existing_products):
     try:
-        # Grundlegende Validierung
-        if not product.get("title") or not product.get("variants"):
+        if "title" not in product or "variants" not in product or not product["variants"]:
             print("❌ Produktdaten unvollständig, überspringe Produkt")
             return False
 
-        first_variant = product["variants"][0]
-        if not first_variant.get("sku"):
-            print("❌ SKU fehlt in der ersten Variante, überspringe Produkt")
+        available_variant = next((v for v in product["variants"] if v["available"]), None)
+        if not available_variant:
+            print(f"❌ Keine verfügbare Variante für Produkt '{product['title']}', überspringe Produkt")
             return False
 
-        # Existierendes Produkt finden
+        first_sku = product["variants"][0]["sku"]
         existing_product = None
         existing_variant = None
-        
+
         for p in existing_products:
             for v in p["variants"]:
-                if v["sku"] == first_variant["sku"]:
+                if v["sku"] == first_sku:
                     existing_product = p
                     existing_variant = v
                     break
             if existing_product:
                 break
 
-        # Produkt aktualisieren oder erstellen
         if existing_product:
             print(f"🔄 Produkt '{product['title']}' existiert bereits. Aktualisiere...")
-            
-            # Bestand aktualisieren
-            if existing_variant.get("inventory_item_id"):
-                update_inventory(
-                    inventory_item_id=existing_variant["inventory_item_id"],
-                    available=first_variant["available"]
-                )
-            
-            # Produktdaten aktualisieren
+
+            success = update_inventory(
+                inventory_item_id=existing_variant["inventory_item_id"],
+                available=product["variants"][0]["available"]
+            )
+
+            if success:
+                print(f"✅ Bestand für Variante {existing_variant['sku']} aktualisiert")
+            else:
+                print(f"❌ Fehler beim Aktualisieren des Bestands für Variante {existing_variant['sku']}")
+
             product_payload = build_product_payload(product, is_update=True)
             product_payload["product"]["id"] = existing_product["id"]
-            
+
             response = make_shopify_request(
                 f"{product_url}{existing_product['id']}.json",
                 method="PUT",
                 json_data=product_payload
             )
-            
-            return response is not None
-        
+
+            if response:
+                print(f"✅ Produkt inkl. Preisanpassung aktualisiert")
+                return True
+            else:
+                print(f"❌ Fehler beim Aktualisieren")
+                return False
+
         else:
             print(f"➕ Produkt '{product['title']}' existiert noch nicht. Füge hinzu...")
-            
+
             product_payload = build_product_payload(product)
             response = make_shopify_request(api_url, method="POST", json_data=product_payload)
-            
-            if response and "published_at" not in product:
-                # Veröffentlichen, falls nicht bereits gesetzt
-                update_payload = {
-                    "product": {
-                        "id": response.json()["product"]["id"],
-                        "published_at": datetime.now().isoformat()
+
+            if response:
+                print(f"✅ Produkt mit angepasstem Preis hinzugefügt")
+
+                if "published_at" not in product:
+                    update_payload = {
+                        "product": {
+                            "id": response.json()["product"]["id"],
+                            "published_at": datetime.now().isoformat()
+                        }
                     }
-                }
-                make_shopify_request(
-                    f"{product_url}{response.json()['product']['id']}.json",
-                    method="PUT",
-                    json_data=update_payload
-                )
-            
-            return response is not None
+                    make_shopify_request(
+                        f"{product_url}{response.json()['product']['id']}.json",
+                        method="PUT",
+                        json_data=update_payload
+                    )
+                return True
+            else:
+                print(f"❌ Fehler beim Hinzufügen")
+                return False
 
     except Exception as e:
-        print(f"❌ Unerwarteter Fehler bei {product.get('title', 'Unbekanntes Produkt')}: {e}")
+        print(f"❌ Unerwarteter Fehler: {e}")
         return False
 
 def process_brand_file(brand_file):
@@ -272,7 +302,7 @@ def process_brand_file(brand_file):
         with open(brand_file, 'r', encoding='utf-8') as json_file:
             products_data = json.load(json_file)
 
-        brand_name = os.path.basename(brand_file).split('.')[0]
+        brand_name = brand_file.split('/')[1].split('.')[0]
         print(f"🔍 Verarbeite {brand_name} mit {len(products_data)} Produkten...")
 
         existing_products = get_existing_products()
@@ -295,6 +325,7 @@ def process_brand_file(brand_file):
         return 0
 
 # Liste der Markendateien
+
 brand_files = [
     'output/pesoclo.json',
     'output/6pm.json',
@@ -353,7 +384,7 @@ if __name__ == "__main__":
         for variant in product["variants"]:
             sku = variant.get("sku")
             if sku and sku not in seen_skus:
-                if update_inventory(variant["inventory_item_id"], available=0):
+                if update_inventory(variant["inventory_item_id"], available=False):
                     print(f"🚫 Bestand auf 0 für SKU {sku}")
                     disabled_count += 1
 
