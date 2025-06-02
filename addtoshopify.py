@@ -220,62 +220,82 @@ def process_product(product, existing_products):
             print("❌ Produktdaten unvollständig, überspringe Produkt")
             return False
 
-        available_variant = next((v for v in product["variants"] if v["available"]), None)
-        if not available_variant:
-            print(f"❌ Keine verfügbare Variante für Produkt '{product['title']}', überspringe Produkt")
-            return False
-
-        first_sku = product["variants"][0]["sku"]
+        # Verbesserte Duplikatsprüfung - prüfe alle SKUs des Produkts
+        product_skus = {v["sku"] for v in product["variants"] if "sku" in v}
         existing_product = None
-        existing_variant = None
+        matching_variants = []
 
         for p in existing_products:
             for v in p["variants"]:
-                if v["sku"] == first_sku:
+                if v.get("sku") in product_skus:
                     existing_product = p
-                    existing_variant = v
+                    matching_variants.append(v)
                     break
             if existing_product:
                 break
 
         if existing_product:
-            print(f"🔄 Produkt '{product['title']}' existiert bereits. Aktualisiere...")
+            print(f"🔄 Produkt '{product['title']}' existiert bereits (ID: {existing_product['id']})")
+            
+            # Aktualisiere alle Varianten
+            success = True
+            for variant in product["variants"]:
+                # Finde passende existierende Variante
+                existing_variant = next(
+                    (v for v in matching_variants if v.get("sku") == variant.get("sku")),
+                    None
+                )
+                
+                if existing_variant:
+                    # Aktualisiere Verfügbarkeit
+                    current_available = variant["available"]
+                    update_success = update_inventory(
+                        inventory_item_id=existing_variant["inventory_item_id"],
+                        available=current_available
+                    )
+                    
+                    if update_success:
+                        status = "verfügbar" if current_available else "nicht verfügbar"
+                        print(f"✅ Bestand für {existing_variant['sku']} auf {status} gesetzt")
+                    else:
+                        print(f"❌ Fehler beim Aktualisieren des Bestands für {existing_variant['sku']}")
+                        success = False
+                else:
+                    print(f"⚠️ Variante {variant.get('sku')} nicht im existierenden Produkt gefunden")
+                    success = False
 
-            success = update_inventory(
-                inventory_item_id=existing_variant["inventory_item_id"],
-                available=product["variants"][0]["available"]
-            )
-
-            if success:
-                print(f"✅ Bestand für Variante {existing_variant['sku']} aktualisiert")
-            else:
-                print(f"❌ Fehler beim Aktualisieren des Bestands für Variante {existing_variant['sku']}")
-
+            # Produktdetails aktualisieren
             product_payload = build_product_payload(product, is_update=True)
             product_payload["product"]["id"] = existing_product["id"]
-
+            
             response = make_shopify_request(
                 f"{product_url}{existing_product['id']}.json",
                 method="PUT",
                 json_data=product_payload
             )
 
-            if response:
-                print(f"✅ Produkt inkl. Preisanpassung aktualisiert")
+            if response and success:
+                print(f"✅ Produkt erfolgreich aktualisiert")
                 return True
             else:
-                print(f"❌ Fehler beim Aktualisieren")
+                print(f"❌ Fehler beim Aktualisieren des Produkts")
                 return False
 
         else:
             print(f"➕ Produkt '{product['title']}' existiert noch nicht. Füge hinzu...")
+            
+            # Prüfe ob mindestens eine Variante verfügbar ist
+            if not any(v.get("available", False) for v in product["variants"]):
+                print(f"⚠️ Keine verfügbaren Varianten, überspringe Produkt")
+                return False
 
             product_payload = build_product_payload(product)
             response = make_shopify_request(api_url, method="POST", json_data=product_payload)
 
             if response:
                 print(f"✅ Produkt mit angepasstem Preis hinzugefügt")
-
+                
+                # Veröffentlichen falls nicht gesetzt
                 if "published_at" not in product:
                     update_payload = {
                         "product": {
