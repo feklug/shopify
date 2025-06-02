@@ -216,70 +216,69 @@ def build_product_payload(product_data, is_update=False):
 
 def process_product(product, existing_products):
     try:
-        if "title" not in product or "variants" not in product or not product["variants"]:
-            print("❌ Produktdaten unvollständig, überspringe Produkt")
+        if not validate_product_data(product):
+            print("❌ Ungültige Produktdaten")
             return False
 
-        # Verbesserte Duplikatsprüfung - prüfe alle SKUs des Produkts
+        # Erweitere Duplikatsprüfung
         product_skus = {v["sku"] for v in product["variants"] if "sku" in v}
         existing_product = None
-        matching_variants = []
+        variant_map = {}  # SKU -> existing_variant
 
+        # Durchsuche alle Produkte und Varianten
         for p in existing_products:
             for v in p["variants"]:
                 if v.get("sku") in product_skus:
                     existing_product = p
-                    matching_variants.append(v)
-                    break
+                    variant_map[v["sku"]] = v
+                    # Kein break mehr, um alle Varianten zu finden
+            
             if existing_product:
+                # Jetzt alle Varianten des gefundenen Produkts prüfen
+                for v in existing_product["variants"]:
+                    if v.get("sku") in product_skus and v["sku"] not in variant_map:
+                        variant_map[v["sku"]] = v
                 break
 
         if existing_product:
-            print(f"🔄 Produkt '{product['title']}' existiert bereits (ID: {existing_product['id']})")
+            print(f"🔄 Produkt '{product['title']}' existiert (ID: {existing_product['id']})")
             
-            # Aktualisiere alle Varianten
             success = True
+            # Aktualisiere alle Varianten des Input-Produkts
             for variant in product["variants"]:
-                # Finde passende existierende Variante
-                existing_variant = next(
-                    (v for v in matching_variants if v.get("sku") == variant.get("sku")),
-                    None
-                )
+                existing_variant = variant_map.get(variant["sku"])
                 
                 if existing_variant:
-                    # Aktualisiere Verfügbarkeit
-                    current_available = variant["available"]
                     update_success = update_inventory(
-                        inventory_item_id=existing_variant["inventory_item_id"],
-                        available=current_available
+                        existing_variant["inventory_item_id"],
+                        variant["available"]
                     )
-                    
-                    if update_success:
-                        status = "verfügbar" if current_available else "nicht verfügbar"
-                        print(f"✅ Bestand für {existing_variant['sku']} auf {status} gesetzt")
-                    else:
-                        print(f"❌ Fehler beim Aktualisieren des Bestands für {existing_variant['sku']}")
+                    if not update_success:
                         success = False
                 else:
-                    print(f"⚠️ Variante {variant.get('sku')} nicht im existierenden Produkt gefunden")
-                    success = False
+                    print(f"⚠️ Neue Variante {variant['sku']} wird hinzugefügt")
+                    success = False  # Neue Variante erfordert Produkt-Update
 
-            # Produktdetails aktualisieren
-            product_payload = build_product_payload(product, is_update=True)
-            product_payload["product"]["id"] = existing_product["id"]
-            
-            response = make_shopify_request(
-                f"{product_url}{existing_product['id']}.json",
-                method="PUT",
-                json_data=product_payload
-            )
-
-            if response and success:
-                print(f"✅ Produkt erfolgreich aktualisiert")
-                return True
+            # Produkt-Update nur wenn alle Varianten existieren
+            if success and len(variant_map) == len(product["variants"]):
+                product_payload = build_product_payload(product, is_update=True)
+                product_payload["product"]["id"] = existing_product["id"]
+                
+                response = make_shopify_request(
+                    f"{product_url}{existing_product['id']}.json",
+                    method="PUT",
+                    json_data=product_payload
+                )
+                
+                if response:
+                    return True
+                else:
+                    print("❌ Produktupdate fehlgeschlagen")
+                    return False
             else:
-                print(f"❌ Fehler beim Aktualisieren des Produkts")
+                print("⚠️ Nicht alle Varianten konnten aktualisiert werden")
                 return False
+
 
         else:
             print(f"➕ Produkt '{product['title']}' existiert noch nicht. Füge hinzu...")
@@ -316,6 +315,23 @@ def process_product(product, existing_products):
     except Exception as e:
         print(f"❌ Unerwarteter Fehler: {e}")
         return False
+    
+def validate_product_data(product):
+    """Erweiterte Validierung"""
+    required = ["title", "variants"]
+    if not all(field in product for field in required):
+        return False
+    
+    if not isinstance(product["variants"], list) or not product["variants"]:
+        return False
+    
+    for v in product["variants"]:
+        if not all(k in v for k in ["sku", "price", "available"]):
+            return False
+        if not isinstance(v["available"], bool):
+            return False
+            
+    return True
 
 def process_brand_file(brand_file):
     try:
