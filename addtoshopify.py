@@ -227,6 +227,11 @@ def build_product_payload(product_data, is_update=False):
 
 def process_product(product, existing_products):
     try:
+        # Frühzeitige Prüfung auf Fast Bundle
+        if product.get("vendor") == "Fast Bundle":
+            print(f"⏩ Fast Bundle Produkt '{product['title']}' wird übersprungen")
+            return False
+            
         if not validate_product_data(product):
             print("❌ Ungültige Produktdaten")
             return False
@@ -335,6 +340,11 @@ def validate_product_data(product):
     if not all(field in product for field in required):
         return False
     
+    # Ausschluss von Fast Bundle Produkten
+    if product.get("vendor") == "Fast Bundle":
+        print("⏩ Fast Bundle Produkt wird übersprungen")
+        return False
+    
     if not isinstance(product["variants"], list) or not product["variants"]:
         return False
     
@@ -409,6 +419,7 @@ brand_files = [
     'output/unvainstudios.json',
     'output/hunidesign.json',
     'output/deputydepartment.json',
+
 ]
 
 if __name__ == "__main__":
