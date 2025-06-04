@@ -5,31 +5,16 @@ from datetime import datetime
 import concurrent.futures
 import time
 import math
-from typing import List, Dict, Optional, Union
-from ratelimit import limits, sleep_and_retry
 
-# Konfiguration
-CONFIG = {
-    "CACHE_TTL": 300,  # 5 Minuten Cache Gültigkeit
-    "MAX_WORKERS": 2,  # Reduzierte Worker-Anzahl für Rate Limits
-    "DEFAULT_STOCK": 1000,
-    "PRICE_MARKUP": 1.075,  # 7.5% Aufschlag
-    "PRICE_ROUNDING": 0.99,
-    "API_VERSION": "2024-01",
-    "REQUEST_DELAY": 0.5  # Pause zwischen Anfragen in Sekunden
-}
-
-# Shopify-Zugangsdaten
-access_token = os.getenv("SHOPIFY_TOKEN")
-shop_url = os.getenv("SHOPIFY_URL")
 api_version = "2024-01"
 LOCATION_ID = "108058247432"
+access_token = os.getenv("SHOPIFY_TOKEN")
+shop_url = os.getenv("SHOPIFY_URL")
 
 # API-Endpunkte
-base_url = f"https://{shop_url}/admin/api/{CONFIG['API_VERSION']}"
-api_url = f"{base_url}/products.json"
-product_url = f"{base_url}/products/"
-inventory_url = f"{base_url}/inventory_levels/set.json"
+api_url = f"https://{shop_url}/admin/api/{api_version}/products.json"
+product_url = f"https://{shop_url}/admin/api/{api_version}/products/"
+inventory_url = f"https://{shop_url}/admin/api/{api_version}/inventory_levels/set.json"
 
 headers = {
     "Content-Type": "application/json",
@@ -39,14 +24,40 @@ headers = {
 # Cache für vorhandene Produkte
 existing_products_cache = None
 last_cache_update = 0
+CACHE_TTL = 300  # 5 Minuten Cache Gültigkeit
 
-# Rate Limited API Request Funktion
-@sleep_and_retry
-@limits(calls=2, period=1)  # 2 Anfragen pro Sekunde
-def make_shopify_request(url: str, method: str = "GET", json_data: Optional[Dict] = None, max_retries: int = 3) -> Optional[requests.Response]:
+# Globaler SKU-Cache zur Duplikaterkennung
+global_sku_cache = set()
+
+def calculate_adjusted_price(original_price):
+    """
+    Berechnet den angepassten Preis:
+    1. Fügt 7.5% zum Originalpreis hinzu
+    2. Rundet auf X.99 auf
+    """
+    try:
+        if isinstance(original_price, str):
+            original_price = float(original_price.replace("€", "").strip())
+        
+        # 7.5% Aufschlag
+        increased_price = original_price * 1.075
+        
+        # Auf X.99 aufrunden
+        if increased_price % 1 < 0.99:
+            adjusted_price = math.floor(increased_price) + 0.99
+        else:
+            adjusted_price = math.ceil(increased_price) + 0.99
+        
+        return round(adjusted_price, 2)
+    except (ValueError, TypeError) as e:
+        print(f"⚠️ Preisberechnungsfehler für {original_price}: {e}")
+        return original_price  # Fallback zum Originalpreis
+
+def make_shopify_request(url, method="GET", json_data=None, max_retries=3):
     retries = 0
     while retries < max_retries:
         try:
+            time.sleep(0.5)  # Rate Limiting: 2 Anfragen/Sekunde
             if method == "GET":
                 response = requests.get(url, headers=headers)
             elif method == "POST":
@@ -56,11 +67,7 @@ def make_shopify_request(url: str, method: str = "GET", json_data: Optional[Dict
 
             response.raise_for_status()
             return response
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                retry_after = int(e.response.headers.get('Retry-After', 10))
-                time.sleep(retry_after)
-                continue
+        except requests.exceptions.RequestException as e:
             retries += 1
             if retries == max_retries:
                 print(f"❌ Fehler bei API-Anfrage: {e}")
@@ -68,97 +75,56 @@ def make_shopify_request(url: str, method: str = "GET", json_data: Optional[Dict
                     print(f"Fehlerdetails: {e.response.text}")
                 return None
             time.sleep(2 ** retries)  # Exponentielles Backoff
-        except requests.exceptions.RequestException as e:
-            retries += 1
-            if retries == max_retries:
-                print(f"❌ Verbindungsfehler: {e}")
-                return None
-            time.sleep(2 ** retries)
 
-def calculate_adjusted_price(original_price: Union[str, float]) -> float:
-    """
-    Berechnet den angepassten Preis mit Aufschlag und Rundung.
-    
-    Args:
-        original_price: Originalpreis als String (mit €) oder Zahl
-        
-    Returns:
-        Angepasster Preis mit 7.5% Aufschlag, gerundet auf .99
-        
-    Raises:
-        ValueError: Wenn Preis nicht konvertiert werden kann
-    """
-    try:
-        if isinstance(original_price, str):
-            original_price = float(original_price.replace("€", "").strip())
-        
-        increased_price = original_price * CONFIG["PRICE_MARKUP"]
-        
-        if increased_price % 1 < CONFIG["PRICE_ROUNDING"]:
-            adjusted_price = math.floor(increased_price) + CONFIG["PRICE_ROUNDING"]
-        else:
-            adjusted_price = math.ceil(increased_price) + CONFIG["PRICE_ROUNDING"]
-        
-        return round(adjusted_price, 2)
-    except (ValueError, TypeError) as e:
-        print(f"⚠️ Preisberechnungsfehler für {original_price}: {e}")
-        return original_price  # Fallback zum Originalpreis
-
-def get_existing_products(force_refresh: bool = False) -> List[Dict]:
-    global existing_products_cache, last_cache_update
+def get_existing_products(force_refresh=False):
+    global existing_products_cache, last_cache_update, global_sku_cache
 
     current_time = time.time()
-    if (force_refresh or 
-        existing_products_cache is None or 
-        (current_time - last_cache_update) > CONFIG["CACHE_TTL"]):
-        
+    if force_refresh or existing_products_cache is None or (current_time - last_cache_update) > CACHE_TTL:
         print("🔄 Aktualisiere Produkt-Cache...")
-        time.sleep(CONFIG["REQUEST_DELAY"])  # Rate Limit beachten
-        
         all_products = []
         url = f"{api_url}?limit=250"
 
         while url:
             response = make_shopify_request(url)
-            if not response:
-                break
+            if response:
+                products = response.json().get("products", [])
+                all_products.extend(products)
 
-            products = response.json().get("products", [])
-            all_products.extend(products)
+                # SKUs zum globalen Cache hinzufügen
+                for product in products:
+                    for variant in product.get('variants', []):
+                        if 'sku' in variant:
+                            global_sku_cache.add(variant['sku'])
 
-            # Paginierung
-            if 'Link' in response.headers:
-                links = response.headers['Link']
-                next_page_url = None
-                for link in links.split(','):
-                    if 'rel="next"' in link:
-                        next_page_url = link[link.find('<') + 1:link.find('>')]
-                        break
-                url = next_page_url
-                time.sleep(CONFIG["REQUEST_DELAY"])  # Pause zwischen Seiten
+                if 'Link' in response.headers:
+                    links = response.headers['Link']
+                    next_page_url = None
+                    for link in links.split(','):
+                        if 'rel="next"' in link:
+                            next_page_url = link[link.find('<') + 1:link.find('>')]
+                            break
+                    url = next_page_url
+                else:
+                    break
             else:
-                url = None
+                break
 
         existing_products_cache = all_products
         last_cache_update = current_time
 
     return existing_products_cache
 
-def update_inventory(inventory_item_id: str, available: bool) -> bool:
-    """Aktualisiert den Lagerbestand für ein Inventaritem"""
-    time.sleep(CONFIG["REQUEST_DELAY"])  # Rate Limit beachten
-    
+def update_inventory(inventory_item_id, available):
     payload = {
         "location_id": LOCATION_ID,
         "inventory_item_id": inventory_item_id,
-        "available": CONFIG["DEFAULT_STOCK"] if available else 0
+        "available": 1000 if available else 0
     }
-    
     response = make_shopify_request(inventory_url, method="POST", json_data=payload)
     return response is not None
 
-def build_product_payload(product_data: Dict, is_update: bool = False) -> Dict:
-    """Erstellt den Payload für Produktcreate/update"""
+def build_product_payload(product_data, is_update=False):
     payload = {
         "product": {
             "title": product_data["title"],
@@ -168,34 +134,51 @@ def build_product_payload(product_data: Dict, is_update: bool = False) -> Dict:
         }
     }
 
-    # Optionen nur bei mehreren Varianten
     if len(product_data["variants"]) > 1 or any(v.get("variant_title") for v in product_data["variants"]):
         payload["product"]["options"] = [{"name": "Size"}]
 
-    # Veröffentlichungsdatum
     published_at = product_data.get("published_at")
     if published_at:
         try:
             if isinstance(published_at, str):
                 datetime.fromisoformat(published_at)
                 payload["product"]["published_at"] = published_at
+            else:
+                print("⚠️ published_at ist kein String, wird nicht übernommen")
         except ValueError as e:
-            print(f"⚠️ Ungültiges published_at Format: {e}")
+            print(f"⚠️ Ungültiges published_at Format: {e}, wird nicht übernommen")
+    else:
+        payload["product"]["published_at"] = datetime.now().isoformat()
 
-    # Metadaten
-    metadata_fields = ["vendor", "product_type", "tags", "handle", "created_at", "updated_at"]
-    for field in metadata_fields:
+    metadata_fields = {
+        "vendor": None,
+        "product_type": None,
+        "tags": None,
+        "handle": None,
+        "created_at": None,
+        "updated_at": None
+    }
+
+    for field, default in metadata_fields.items():
         if field in product_data:
-            payload["product"][field] = product_data[field]
+            if field.endswith("_at") and product_data[field]:
+                try:
+                    if isinstance(product_data[field], str):
+                        dt = datetime.fromisoformat(product_data[field])
+                        payload["product"][field] = dt.isoformat()
+                    else:
+                        payload["product"][field] = product_data[field]
+                except ValueError:
+                    print(f"⚠️ Ungültiges Datumsformat für {field}, wird übersprungen")
+            else:
+                payload["product"][field] = product_data[field]
 
-    # Bilder (ohne Duplikate)
     image_urls = set()
     for variant in product_data["variants"]:
         for img_url in variant.get("images", []):
             image_urls.add(img_url)
     payload["product"]["images"] = [{"src": img} for img in image_urls]
 
-    # Varianten
     for variant in product_data["variants"]:
         try:
             original_price = variant["price"]
@@ -204,7 +187,7 @@ def build_product_payload(product_data: Dict, is_update: bool = False) -> Dict:
             variant_payload = {
                 "price": str(adjusted_price),
                 "sku": variant["sku"],
-                "inventory_quantity": CONFIG["DEFAULT_STOCK"] if variant["available"] else 0,
+                "inventory_quantity": 1000 if variant["available"] else 0,
                 "inventory_management": "shopify",
                 "inventory_policy": "deny"
             }
@@ -212,9 +195,15 @@ def build_product_payload(product_data: Dict, is_update: bool = False) -> Dict:
             if "variant_title" in variant:
                 variant_payload["option1"] = variant["variant_title"]
 
-            # Optionale Felder
-            optional_fields = ["barcode", "weight", "weight_unit", "taxable", "compare_at_price"]
-            for field in optional_fields:
+            optional_fields = {
+                "barcode": None,
+                "weight": None,
+                "weight_unit": None,
+                "taxable": None,
+                "compare_at_price": None
+            }
+            
+            for field, default in optional_fields.items():
                 if field in variant:
                     variant_payload[field] = variant[field]
 
@@ -223,36 +212,22 @@ def build_product_payload(product_data: Dict, is_update: bool = False) -> Dict:
             print(f"💰 Preis angepasst: {original_price} → {adjusted_price}")
             
         except KeyError as e:
-            print(f"⚠️ Wichtiges Variantenfeld fehlt: {e}")
+            print(f"⚠️ Wichtiges Variantenfeld fehlt: {e}, Variante wird übersprungen")
 
     return payload
 
-def validate_product_data(product: Dict) -> bool:
-    """Validiert die Produktdaten"""
-    required = ["title", "variants"]
-    if not all(field in product for field in required):
-        return False
-    
-    if not isinstance(product["variants"], list) or not product["variants"]:
-        return False
-    
-    for v in product["variants"]:
-        if not all(k in v for k in ["sku", "price", "available"]):
-            return False
-        if not isinstance(v["available"], bool):
-            return False
-            
-    return True
-
-def process_product(product: Dict, existing_products: List[Dict]) -> bool:
-    """Verarbeitet ein einzelnes Produkt"""
+def process_product(product, existing_products):
     try:
         if not validate_product_data(product):
             print("❌ Ungültige Produktdaten")
             return False
 
-        # Finde vorhandenes Produkt anhand der SKUs
+        # Prüfe auf Duplikate im globalen Cache
         product_skus = {v["sku"] for v in product["variants"] if "sku" in v}
+        if any(sku in global_sku_cache for sku in product_skus):
+            print(f"⏩ Produkt '{product['title']}' mit SKUs {product_skus} existiert bereits, überspringe...")
+            return False
+
         existing_product = None
         variant_map = {}
 
@@ -263,6 +238,9 @@ def process_product(product: Dict, existing_products: List[Dict]) -> bool:
                     variant_map[v["sku"]] = v
             
             if existing_product:
+                for v in existing_product["variants"]:
+                    if v.get("sku") in product_skus and v["sku"] not in variant_map:
+                        variant_map[v["sku"]] = v
                 break
 
         if existing_product:
@@ -273,10 +251,11 @@ def process_product(product: Dict, existing_products: List[Dict]) -> bool:
                 existing_variant = variant_map.get(variant["sku"])
                 
                 if existing_variant:
-                    if not update_inventory(
+                    update_success = update_inventory(
                         existing_variant["inventory_item_id"],
                         variant["available"]
-                    ):
+                    )
+                    if not update_success:
                         success = False
                 else:
                     print(f"⚠️ Neue Variante {variant['sku']} wird hinzugefügt")
@@ -292,7 +271,14 @@ def process_product(product: Dict, existing_products: List[Dict]) -> bool:
                     json_data=product_payload
                 )
                 
-                return response is not None
+                if response:
+                    # Nach erfolgreichem Update SKUs zum Cache hinzufügen
+                    for sku in product_skus:
+                        global_sku_cache.add(sku)
+                    return True
+                else:
+                    print("❌ Produktupdate fehlgeschlagen")
+                    return False
             else:
                 print("⚠️ Nicht alle Varianten konnten aktualisiert werden")
                 return False
@@ -309,6 +295,10 @@ def process_product(product: Dict, existing_products: List[Dict]) -> bool:
 
             if response:
                 print(f"✅ Produkt mit angepasstem Preis hinzugefügt")
+                
+                # Nach erfolgreichem Hinzufügen SKUs zum Cache hinzufügen
+                for sku in product_skus:
+                    global_sku_cache.add(sku)
                 
                 if "published_at" not in product:
                     update_payload = {
@@ -330,28 +320,43 @@ def process_product(product: Dict, existing_products: List[Dict]) -> bool:
     except Exception as e:
         print(f"❌ Unerwarteter Fehler: {e}")
         return False
+    
+def validate_product_data(product):
+    required = ["title", "variants"]
+    if not all(field in product for field in required):
+        return False
+    
+    if not isinstance(product["variants"], list) or not product["variants"]:
+        return False
+    
+    for v in product["variants"]:
+        if not all(k in v for k in ["sku", "price", "available"]):
+            return False
+        if not isinstance(v["available"], bool):
+            return False
+            
+    return True
 
-def process_brand_file(brand_file: str) -> int:
-    """Verarbeitet eine Markendatei mit Produkten"""
+def process_brand_file(brand_file):
     try:
         with open(brand_file, 'r', encoding='utf-8') as json_file:
             products_data = json.load(json_file)
 
-        brand_name = os.path.basename(brand_file).split('.')[0]
+        brand_name = brand_file.split('/')[1].split('.')[0]
         print(f"🔍 Verarbeite {brand_name} mit {len(products_data)} Produkten...")
 
         existing_products = get_existing_products()
 
         success_count = 0
-        with concurrent.futures.ThreadPoolExecutor(max_workers=CONFIG["MAX_WORKERS"]) as executor:
-            futures = []
-            for product in products_data:
-                futures.append(executor.submit(process_product, product, existing_products))
-                time.sleep(CONFIG["REQUEST_DELAY"])  # Pause zwischen Produkten
-
-            for future in concurrent.futures.as_completed(futures):
-                if future.result():
-                    success_count += 1
+        batch_size = 10  # Verarbeite in Batches für bessere Performance
+        for i in range(0, len(products_data), batch_size):
+            batch = products_data[i:i + batch_size]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:  # Reduzierte Worker
+                futures = [executor.submit(process_product, product, existing_products) for product in batch]
+                for future in concurrent.futures.as_completed(futures):
+                    if future.result():
+                        success_count += 1
+            time.sleep(1)  # Kurze Pause zwischen Batches
 
         print(f"✅ {success_count}/{len(products_data)} Produkte aus {brand_name} erfolgreich verarbeitet!")
         return success_count
@@ -360,7 +365,6 @@ def process_brand_file(brand_file: str) -> int:
         print(f"❌ Fehler beim Verarbeiten von {brand_file}: {e}")
         return 0
 
-# Liste der Markendateien
 brand_files = [
     'output/pesoclo.json',
     'output/6pm.json',
@@ -393,7 +397,10 @@ if __name__ == "__main__":
     total_processed = 0
     seen_skus = set()
 
-    # SKUs sammeln
+    # Initialisiere globalen SKU-Cache
+    get_existing_products(force_refresh=True)
+
+    # Zuerst alle SKUs sammeln
     for brand_file in brand_files:
         try:
             with open(brand_file, 'r', encoding='utf-8') as f:
@@ -405,7 +412,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"❌ Fehler beim Lesen von {brand_file}: {e}")
 
-    # Produkte verarbeiten
+    # Dann Produkte verarbeiten
     for brand_file in brand_files:
         total_processed += process_brand_file(brand_file)
         get_existing_products(force_refresh=True)
