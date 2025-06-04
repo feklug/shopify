@@ -30,7 +30,6 @@ base_urls = {
     "unvainstudios": "https://unvainstudios.de/collections/all/products.json?page=",
     "hunidesign": "https://hunidesign.com/collections/all/products.json?page=",
     "deputydepartment": "https://deputydepartment.com/en-at/collections/all/products.json?page=",
-    "99based": "https://99based.com/collections/all/products.json?page=",
 
 
 }
