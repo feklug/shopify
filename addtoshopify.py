@@ -409,7 +409,6 @@ brand_files = [
     'output/unvainstudios.json',
     'output/hunidesign.json',
     'output/deputydepartment.json',
-    'output/99based.json'
 ]
 
 if __name__ == "__main__":
