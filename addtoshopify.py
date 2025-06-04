@@ -173,10 +173,19 @@ def build_product_payload(product_data, is_update=False):
             else:
                 payload["product"][field] = product_data[field]
 
-    image_urls = set()
+    # Sammle alle Bilder und behalte die Reihenfolge bei
+    image_urls = []
+    seen_images = set()
+    
+    # Durchlaufe alle Varianten und sammle Bilder in der ursprünglichen Reihenfolge
     for variant in product_data["variants"]:
-        for img_url in variant.get("images", []):
-            image_urls.add(img_url)
+        if "images" in variant:
+            for img_url in variant["images"]:
+                if img_url not in seen_images:
+                    seen_images.add(img_url)
+                    image_urls.append(img_url)
+    
+    # Füge Bilder in der gesammelten Reihenfolge hinzu (erstes Bild zuerst)
     payload["product"]["images"] = [{"src": img} for img in image_urls]
 
     for variant in product_data["variants"]:
@@ -327,6 +336,17 @@ def validate_product_data(product):
         return False
     
     if not isinstance(product["variants"], list) or not product["variants"]:
+        return False
+    
+    # Prüfe, ob mindestens ein Bild vorhanden ist
+    has_images = False
+    for variant in product["variants"]:
+        if "images" in variant and variant["images"]:
+            has_images = True
+            break
+    
+    if not has_images:
+        print("⚠️ Produkt ohne Bilder wird übersprungen")
         return False
     
     for v in product["variants"]:
