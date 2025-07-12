@@ -2,14 +2,13 @@ name: Shopify Auto Sync
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Jeden Tag um 00:00 UTC (Achtung: UTC = 02:00 Uhr in MESZ)
-  workflow_dispatch:      # Optional, manuell auslösbar über GitHub UI
     - cron: '0 0 * * *'    # 00:00 Uhr (UTC)
     - cron: '0 6 * * *'    # 06:00 Uhr (UTC)
     - cron: '0 10 * * *'   # 10:00 Uhr (UTC)
     - cron: '0 14 * * *'   # 14:00 Uhr (UTC)
     - cron: '0 19 * * *'   # 19:00 Uhr (UTC)
     - cron: '0 21 * * *'   # 21:00 Uhr (UTC)
+  
   workflow_dispatch:       # Optional: Manuell auslösbar über GitHub UI
 
 jobs:
