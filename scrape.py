@@ -7,30 +7,13 @@ os.makedirs("output", exist_ok=True)
 
 # Dictionary mit Marken und deren Shopify-Produkt-URLs
 base_urls = {
-"pesoclo": "https://pesoclo.com/de-at/collections/all/products.json?page=",
-    "6pm": "https://www.6pmseason.com/collections/all/products.json?page=",
-    "trendtvision": "https://www.trendtvision.com/collections/all/products.json?page=",
-    "reternity": "https://reternity.de/collections/all/products.json?page=",
-    "Systemic": "https://sys-temic.com/collections/all/products.json?page=",
-    "Vicinity": "https://www.vicinityclo.de/collections/all/products.json?page=",
-    "derschutze": "https://derschutze.com/collections/all/products.json?page=",
-    "MoreMoneyMoreLove": "https://moremoneymorelove.de/collections/all/products.json?page=",
-    "Devourarchive": "https://www.devourarchive.com/collections/all/products.json?page=",
-    "statement-clo": "https://statement-clo.de/collections/all/products.json?page=",
-    "mosquets": "https://mosquets.de/collections/all/products.json?page=",
-    "vacid": "https://www.vacid.com/collections/all/products.json?page=",
-    "root-atelier": "https://www.root-atelier.com/de-en/collections/all/products.json?page=",
-    "olakala": "https://www.olakala.de/collections/all/products.json?page=",
-    "eightyfiveclo": "https://www.eightyfiveclo.com/collections/all/products.json?page=",
-    "atelier-roupa": "https://atelier-roupa.com/collections/all/products.json?page=",
-    "tarmac.clothing": "https://tarmac.clothing/de/collections/all/products.json?page=",
-    "sourire-worldwide": "https://sourire-worldwide.com/collections/all/products.json?page=",
-    "liju-gallery": "https://liju-gallery.com/collections/all/products.json?page=",
-    "sacralite": "https://sacralite.com/collections/all/products.json?page=",
-    "unvainstudios": "https://unvainstudios.de/collections/all/products.json?page=",
-    "hunidesign": "https://hunidesign.com/collections/all/products.json?page=",
-    "deputydepartment": "https://deputydepartment.com/en-at/collections/all/products.json?page=",
-
+"Loveloop": "https://loveloopclo.com/collections/all/products.json?page=",
+"Valeuratelier": "https://valeuratelier.de/collections/all/products.json?page=",
+"Vacayo Clothing": "https://vacayo.de/collections/all/products.json?page=",
+"Nyhro": "https://nyhro.com/collections/all/products.json?page=",
+"after errors": "https://aftererrors.com/collections/all/products.json?page=",
+"Elstar": "https://elstar-shop.com/collections/all/products.json?page=",
+"xdaysleft": "https://xdaysleft-wear.com/collections/all/products.json?page="
 
 }
 
