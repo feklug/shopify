@@ -299,10 +299,6 @@ def process_product(product, existing_products):
 
         else:
             print(f"➕ Produkt '{product['title']}' existiert noch nicht. Füge hinzu...")
-            
-            if not any(v.get("available", False) for v in product["variants"]):
-                print(f"⚠️ Keine verfügbaren Varianten, überspringe Produkt")
-                return False
 
             product_payload = build_product_payload(product)
             response = make_shopify_request(api_url, method="POST", json_data=product_payload)
