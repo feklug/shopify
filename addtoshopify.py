@@ -393,13 +393,14 @@ def process_brand_file(brand_file):
 
 brand_files = [
     
-  'output/loveloop.json',
-    'output/valeuratelier.json',
-    'output/vacayo-clothing.json',
-    'output/nyhro.json',
-    'output/after-errors.json',
-    'output/elstar.json',
-    'output/xdaysleft.json'
+'output/Loveloop.json',
+'output/Valeuratelier.json',
+'output/Vacayo Clothing.json',
+'output/Nyhro.json',
+'output/after errors.json',
+'output/Elstar.json',
+'output/xdaysleft.json'
+
 
 ]
 
