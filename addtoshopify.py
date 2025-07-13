@@ -137,6 +137,7 @@ def build_product_payload(product_data, is_update=False):
     if len(product_data["variants"]) > 1 or any(v.get("variant_title") for v in product_data["variants"]):
         payload["product"]["options"] = [{"name": "Size"}]
 
+    # Veröffentlichungszeitpunkt
     published_at = product_data.get("published_at")
     if published_at:
         try:
@@ -150,18 +151,11 @@ def build_product_payload(product_data, is_update=False):
     else:
         payload["product"]["published_at"] = datetime.now().isoformat()
 
-    metadata_fields = {
-        "vendor": None,
-        "product_type": None,
-        "tags": None,
-        "handle": None,
-        "created_at": None,
-        "updated_at": None
-    }
-
-    for field, default in metadata_fields.items():
-        if field in product_data:
-            if field.endswith("_at") and product_data[field]:
+    # Weitere Metadatenfelder
+    metadata_fields = ["vendor", "product_type", "tags", "handle", "created_at", "updated_at"]
+    for field in metadata_fields:
+        if field in product_data and product_data[field]:
+            if field.endswith("_at"):
                 try:
                     if isinstance(product_data[field], str):
                         dt = datetime.fromisoformat(product_data[field])
@@ -173,28 +167,24 @@ def build_product_payload(product_data, is_update=False):
             else:
                 payload["product"][field] = product_data[field]
 
-    # Sammle alle Bilder und behalte die Reihenfolge bei
-    image_urls = []
+    # Bilder sammeln
     seen_images = set()
-    
-    # Durchlaufe alle Varianten und sammle Bilder in der ursprünglichen Reihenfolge
+    image_urls = []
     for variant in product_data["variants"]:
-        if "images" in variant:
-            for img_url in variant["images"]:
-                if img_url not in seen_images:
-                    seen_images.add(img_url)
-                    image_urls.append(img_url)
-    
-    # Füge Bilder in der gesammelten Reihenfolge hinzu (erstes Bild zuerst)
+        for img_url in variant.get("images", []):
+            if img_url not in seen_images:
+                seen_images.add(img_url)
+                image_urls.append(img_url)
+
     payload["product"]["images"] = [{"src": img} for img in image_urls]
 
+    # Varianten verarbeiten
     for variant in product_data["variants"]:
         try:
-            original_price = variant["price"]
-            adjusted_price = calculate_adjusted_price(original_price)
-            
+            price = variant["price"]
+
             variant_payload = {
-                "price": str(adjusted_price),
+                "price": str(price),
                 "sku": variant["sku"],
                 "inventory_quantity": 1000 if variant["available"] else 0,
                 "inventory_management": "shopify",
@@ -204,26 +194,20 @@ def build_product_payload(product_data, is_update=False):
             if "variant_title" in variant:
                 variant_payload["option1"] = variant["variant_title"]
 
-            optional_fields = {
-                "barcode": None,
-                "weight": None,
-                "weight_unit": None,
-                "taxable": None,
-                "compare_at_price": None
-            }
-            
-            for field, default in optional_fields.items():
+            # Optionale Felder
+            for field in ["barcode", "weight", "weight_unit", "taxable", "compare_at_price"]:
                 if field in variant:
                     variant_payload[field] = variant[field]
 
             payload["product"]["variants"].append(variant_payload)
-            
-            print(f"💰 Preis angepasst: {original_price} → {adjusted_price}")
-            
+
+            print(f"💰 Preis übernommen: {price}")
+
         except KeyError as e:
             print(f"⚠️ Wichtiges Variantenfeld fehlt: {e}, Variante wird übersprungen")
 
     return payload
+
 
 def process_product(product, existing_products):
     try:
@@ -400,6 +384,30 @@ brand_files = [
 'output/after errors.json',
 'output/Elstar.json',
 'output/xdaysleft.json'
+'output/Omage.json',
+'output/Creamstores.json',
+'output/Dustyaffection.json',
+'output/GTEDClo.json',
+'output/DerangeStudios.json',
+'output/EclipseStudios.json',
+'output/StOnee.json',
+'output/Orelien.json',
+'output/Reerect.json',
+'output/ProjectAvise.json',
+'output/Oill.json',
+'output/ReputeVision.json',
+'output/FrankFillerStudios.json',
+'output/Artcademy.json',
+'output/Purpill.json',
+'output/8rb4.json',
+'output/MemoriesDontDie.json',
+'output/AnotherState.json',
+'output/ExitLife.json',
+'output/YeuTheWorld.json',
+'output/NoAnger.json',
+'output/4Hearts.json',
+'output/4thD.json'
+
 
 
 ]
