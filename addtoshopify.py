@@ -383,7 +383,7 @@ brand_files = [
 'output/Nyhro.json',
 'output/after errors.json',
 'output/Elstar.json',
-'output/xdaysleft.json'
+'output/xdaysleft.json',
 'output/Omage.json',
 'output/Creamstores.json',
 'output/Dustyaffection.json',
