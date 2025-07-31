@@ -1,7 +1,9 @@
 name: Shopify Auto Sync
 
-  
-  workflow_dispatch:       # Optional: Manuell auslösbar über GitHub UI
+on:
+  workflow_dispatch:       # Manuell auslösbar
+  schedule:
+    - cron: '0 6 * * *'     # Täglich um 06:00 UTC (je nach Zeitzone anpassen)
 
 jobs:
   run-scripts:
@@ -26,7 +28,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: 🧼 Scraper ausführen
-        run: python scrape.py  # <-- Name deiner Scraping-Datei
+        run: python scrape.py
 
       - name: 🛒 Shopify Uploader ausführen
-        run: python addtoshopify.py  # <-- Datei zum Hochladen
+        run: python addtoshopify.py
+
