@@ -383,10 +383,8 @@ brand_files = [
 'output/Orelien.json',
 'output/Reerect.json',
 'output/frankfillerstudios.json',
-'output/timeseekers.json'
+'output/timeseekers.json',
 'output/victorbraunstudios.json'
-
-
 
 ]
 
