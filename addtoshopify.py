@@ -378,35 +378,13 @@ def process_brand_file(brand_file):
 brand_files = [
     
 'output/Loveloop.json',
-'output/Valeuratelier.json',
-'output/Vacayo Clothing.json',
-'output/Nyhro.json',
-'output/after errors.json',
-'output/Elstar.json',
-'output/xdaysleft.json',
-'output/Omage.json',
-'output/Creamstores.json',
-'output/Dustyaffection.json',
-'output/GTEDClo.json',
-'output/DerangeStudios.json',
-'output/EclipseStudios.json',
-'output/StOnee.json',
+'output/vacayo.json',
+'output/nyhro.json',
 'output/Orelien.json',
 'output/Reerect.json',
-'output/ProjectAvise.json',
-'output/Oill.json',
-'output/ReputeVision.json',
-'output/FrankFillerStudios.json',
-'output/Artcademy.json',
-'output/Purpill.json',
-'output/8rb4.json',
-'output/MemoriesDontDie.json',
-'output/AnotherState.json',
-'output/ExitLife.json',
-'output/YeuTheWorld.json',
-'output/NoAnger.json',
-'output/4Hearts.json',
-'output/4thD.json'
+'output/frankfillerstudios.json',
+'output/timeseekers.json'
+'output/victorbraunstudios.json'
 
 
 
