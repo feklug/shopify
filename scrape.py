@@ -8,35 +8,13 @@ os.makedirs("output", exist_ok=True)
 # Dictionary mit Marken und deren Shopify-Produkt-URLs
 base_urls = {
 "Loveloop": "https://loveloopclo.com/collections/all/products.json?page=",
-"Valeuratelier": "https://valeuratelier.de/collections/all/products.json?page=",
-"Vacayo Clothing": "https://vacayo.de/collections/all/products.json?page=",
-"Nyhro": "https://nyhro.com/collections/all/products.json?page=",
-"after errors": "https://aftererrors.com/collections/all/products.json?page=",
-"Elstar": "https://elstar-shop.com/collections/all/products.json?page=",
-"xdaysleft": "https://xdaysleft-wear.com/collections/all/products.json?page=",
-"Omage": "https://omage.xyz/collections/all/products.json?page=",
-"Creamstores": "https://creamstores.com/collections/all/products.json?page=",
-"Dustyaffection": "https://dustyaffection.com/collections/all/products.json?page=",
-"GTEDClo": "https://gtedclo.com/collections/all/products.json?page=",
-"DerangeStudios": "https://derangestudios.com/collections/all/products.json?page=",
-"EclipseStudios": "https://eclipse-studios.de/collections/all/products.json?page=",
-"StOnee": "https://st-onee.com/collections/all/products.json?page=",
+"vacayo": "https://vacayo.de/collections/all/products.json?page=",
+"nyhro": "https://nyhro.com/collections/all/products.json?page=",
 "Orelien": "https://orelien-official.com/collections/all/products.json?page=",
 "Reerect": "https://reerect.de/collections/all/products.json?page=",
-"ProjectAvise": "https://www.projectavise.de/collections/all/products.json?page=",
-"Oill": "https://oill.xyz/collections/all/products.json?page=",
-"ReputeVision": "https://www.reputevision.com/collections/all/products.json?page=",
-"FrankFillerStudios": "https://frankfillerstudios.de/collections/all/products.json?page=",
-"Artcademy": "https://artcademy.store/collections/all/products.json?page=",
-"Purpill": "https://www.purpill.eu/collections/all/products.json?page=",
-"8rb4": "https://8rb4.com/collections/all/products.json?page=",
-"MemoriesDontDie": "https://www.memoriesdontdie.de/collections/all/products.json?page=",
-"AnotherState": "https://anotherstate.net/collections/all/products.json?page=",
-"ExitLife": "https://exitlife.de/collections/all/products.json?page=",
-"YeuTheWorld": "https://yeutheworld.com/collections/all/products.json?page=",
-"NoAnger": "https://noanger.de/collections/all/products.json?page=",
-"4Hearts": "https://www.4hearts.de/collections/all/products.json?page=",
-"4thD": "https://4thd.de/collections/all/products.json?page="
+"frankfillerstudios": "https://frankfillerstudios.de/collections/all/products.json?page=",
+"timeseekers": "https://timeseekers.eu/collections/all/products.json?page=",
+"victorbraunstudios": "https://victorbraunstudios.com/collections/all/products.json?page="
 
 }
 
