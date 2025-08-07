@@ -376,12 +376,7 @@ def process_brand_file(brand_file):
         return 0
 
 brand_files = [
-    
-'output/Loveloop.json',
-'output/vacayo.json',
-'output/nyhro.json',
-'output/Orelien.json',
-'output/Reerect.json',
+
 'output/frankfillerstudios.json',
 'output/timeseekers.json',
 'output/victorbraunstudios.json'
