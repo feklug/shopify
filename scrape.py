@@ -7,11 +7,6 @@ os.makedirs("output", exist_ok=True)
 
 # Dictionary mit Marken und deren Shopify-Produkt-URLs
 base_urls = {
-"Loveloop": "https://loveloopclo.com/collections/all/products.json?page=",
-"vacayo": "https://vacayo.de/collections/all/products.json?page=",
-"nyhro": "https://nyhro.com/collections/all/products.json?page=",
-"Orelien": "https://orelien-official.com/collections/all/products.json?page=",
-"Reerect": "https://reerect.de/collections/all/products.json?page=",
 "frankfillerstudios": "https://frankfillerstudios.de/collections/all/products.json?page=",
 "timeseekers": "https://timeseekers.eu/collections/all/products.json?page=",
 "victorbraunstudios": "https://victorbraunstudios.com/collections/all/products.json?page="
