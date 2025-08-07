@@ -1,9 +1,5 @@
 name: Shopify Auto Sync
 
-on:
-  workflow_dispatch:       # Manuell auslösbar
-  schedule:
-    - cron: '0 6 * * *'     # Täglich um 06:00 UTC (je nach Zeitzone anpassen)
 
 jobs:
   run-scripts:
